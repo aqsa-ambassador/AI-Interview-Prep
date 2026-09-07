@@ -1,4 +1,3 @@
-````python
 import streamlit as st
 from groq import Groq
 import google.generativeai as genai
@@ -277,4 +276,4 @@ if "questions" in st.session_state:
     st.success(
         "Your interview preparation guide is ready! 🎉"
     )
-````
+
