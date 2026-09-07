@@ -98,7 +98,7 @@ Use exactly this structure:
 """
 
   response = client.chat.completions.create(
-      model="llama-3.3-70b-versatile",
+      model="llama-3.1-8b-instant",
       messages=[
           {
               "role": "system",
@@ -119,7 +119,7 @@ Use exactly this structure:
 
 def generate_with_google(job_title):
   genai.configure(api_key=google_key)
-  model = genai.GenerativeModel("gemini-1.5-flash")
+  model = genai.GenerativeModel("gemini-3.6-flash")
 
   prompt = f"""
 You are an expert job interview coach.
@@ -182,7 +182,7 @@ if st.button("🚀 Generate Interview Questions", use_container_width=True):
         except Exception as e:
           error_logs.append(f"Groq Error: {str(e)}")
 
-      # Try Gemini if Groq failed or wasn't available
+      # Try Gemini if Groq failed
       if not result and google_key:
         try:
           result = generate_with_google(job_title)
