@@ -173,27 +173,28 @@ if st.button("🚀 Generate Interview Questions", use_container_width=True):
   else:
     with st.spinner("Generating your interview preparation..."):
       result = None
+      error_logs = []
 
-      # Try Groq first (Primary to avoid Gemini quota issues)
+      # Try Groq first
       if groq_key:
         try:
           result = generate_with_groq(job_title)
         except Exception as e:
-          st.info("Groq encountered an issue. Trying Gemini backup...")
+          error_logs.append(f"Groq Error: {str(e)}")
 
-      # Fallback to Gemini if Groq failed
+      # Try Gemini if Groq failed or wasn't available
       if not result and google_key:
         try:
           result = generate_with_google(job_title)
         except Exception as e:
-          st.error(f"Gemini error: {str(e)}")
+          error_logs.append(f"Gemini Error: {str(e)}")
 
       if result and "questions" in result:
         st.session_state["questions"] = result["questions"]
       else:
-        st.error(
-            "Could not generate questions. Please check your API keys or limits."
-        )
+        st.error("Could not generate questions. Detailed errors below:")
+        for err in error_logs:
+          st.code(err)
 
 
 # -----------------------------
