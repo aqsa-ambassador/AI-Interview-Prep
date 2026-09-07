@@ -65,7 +65,9 @@ def clean_json(text):
 
 def generate_with_google(job_title):
   genai.configure(api_key=google_key)
-  model = genai.GenerativeModel("gemini-1.5-flash")
+
+  # Updated to current active model name
+  model = genai.GenerativeModel("gemini-3.6-flash")
 
   prompt = f"""
 You are an expert job interview coach.
@@ -99,6 +101,7 @@ Use exactly this structure:
 """
 
   response = model.generate_content(prompt)
+
   return clean_json(response.text)
 
 
@@ -173,29 +176,21 @@ if st.button("🚀 Generate Interview Questions", use_container_width=True):
 
   else:
     with st.spinner("Generating your interview preparation..."):
-      result = None
-
-      # Try Google Gemini first
-      if google_key:
-        try:
+      try:
+        # Google Gemini is used first
+        if google_key:
           result = generate_with_google(job_title)
-        except Exception as e:
-          st.warning(
-              "Gemini failed or model unavailable. Trying Groq fallback..."
-          )
 
-      # Fallback to Groq if Google failed or wasn't provided
-      if not result and groq_key:
-        try:
+        # Groq is used as fallback
+        elif groq_key:
           result = generate_with_groq(job_title)
-        except Exception as e:
-          st.error(f"Groq also failed: {str(e)}")
 
-      if result and "questions" in result:
         st.session_state["questions"] = result["questions"]
-        st.rerun()
-      else:
-        st.error("Failed to generate questions from available AI providers.")
+
+      except Exception as e:
+        st.error("Something went wrong while generating questions.")
+
+        st.code(str(e))
 
 
 # -----------------------------
@@ -209,12 +204,16 @@ if "questions" in st.session_state:
 
   for index, item in enumerate(st.session_state["questions"], start=1):
     question = item.get("question", "Interview Question")
+
     question_type = item.get("type", "Interview")
+
     answer = item.get("answer", "No answer generated.")
 
     with st.expander(f"{index}. {question}", expanded=False):
       st.markdown(f"**Type:** {question_type}")
+
       st.markdown("### 💡 Ideal Sample Answer")
+
       st.write(answer)
 
   st.success("Your interview preparation guide is ready! 🎉")
