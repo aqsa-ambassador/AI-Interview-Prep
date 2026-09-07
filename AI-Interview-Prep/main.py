@@ -83,20 +83,26 @@ with st.sidebar:
     tech_ratio = st.slider("Technical questions (%)", min_value=20, max_value=90, value=60, step=10)
     difficulty = st.selectbox("Difficulty level", ["Beginner", "Intermediate", "Advanced"], index=1)
 
-    st.divider()
-    st.subheader("🔌 Connection Status")
-    col_a, col_b = st.columns(2)
-    with col_a:
-        st.metric("Groq", "✅ Ready" if groq_key else "❌ Missing")
-    with col_b:
-        st.metric("Gemini", "✅ Ready" if google_key else "❌ Missing")
+    # Only show connection status if something's wrong
+    keys_missing = not (groq_key and google_key)
+    api_errors = st.session_state.get("last_errors", [])
 
-    with st.expander("Debug details"):
-        st.write("Groq key loaded:", bool(groq_key))
-        st.write("Google key loaded:", bool(google_key))
+    if keys_missing or api_errors:
+        st.divider()
+        st.subheader("🔌 Connection Status")
 
-    st.divider()
-    st.caption("Add your API keys in `.streamlit/secrets.toml` as `GROQ_API_KEY` and `GOOGLE_API_KEY`.")
+        if keys_missing:
+            col_a, col_b = st.columns(2)
+            with col_a:
+                st.metric("Groq", "✅ Ready" if groq_key else "❌ Missing")
+            with col_b:
+                st.metric("Gemini", "✅ Ready" if google_key else "❌ Missing")
+            st.caption("Add your API keys in `.streamlit/secrets.toml` as `GROQ_API_KEY` and `GOOGLE_API_KEY`.")
+
+        if api_errors:
+            with st.expander("⚠️ Last generation errors"):
+                for err in api_errors:
+                    st.error(err)
 
 # -----------------------------
 # Main Input Area
@@ -291,11 +297,9 @@ if generate_clicked:
 
         progress.progress(90, text="Finalizing...")
 
+        st.session_state["last_errors"] = errors
+
         if not result or "questions" not in result:
-            if errors:
-                with st.expander("⚠️ API errors (click to view)"):
-                    for err in errors:
-                        st.error(err)
             result = get_fallback_questions(job_title, num_questions, tech_ratio)
             st.info(
                 f"Note: API limits or networks were busy, so a customized "
