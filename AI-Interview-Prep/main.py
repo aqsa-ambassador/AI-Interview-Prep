@@ -66,8 +66,8 @@ def clean_json(text):
 def generate_with_google(job_title):
   genai.configure(api_key=google_key)
 
-  # Active production model endpoint
-  model = genai.GenerativeModel("gemini-2.5-flash")
+  # Updated to current active model name
+  model = genai.GenerativeModel("gemini-3.6-flash")
 
   prompt = f"""
 You are an expert job interview coach.
