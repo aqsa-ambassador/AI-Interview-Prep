@@ -1,17 +1,14 @@
-import streamlit as st
-from groq import Groq
-import google.generativeai as genai
 import json
-
+import google.generativeai as genai
+from groq import Groq
+import streamlit as st
 
 # -----------------------------
 # Page Configuration
 # -----------------------------
 
 st.set_page_config(
-    page_title="AI Interview Prep Generator",
-    page_icon="🤖",
-    layout="centered"
+    page_title="AI Interview Prep Generator", page_icon="🤖", layout="centered"
 )
 
 
@@ -42,8 +39,7 @@ google_key = st.secrets.get("GOOGLE_API_KEY", "")
 # -----------------------------
 
 job_title = st.text_input(
-    "Job Title",
-    placeholder="e.g. Data Analyst, Python Developer"
+    "Job Title", placeholder="e.g. Data Analyst, Python Developer"
 )
 
 
@@ -51,29 +47,29 @@ job_title = st.text_input(
 # Clean JSON Response
 # -----------------------------
 
+
 def clean_json(text):
-    text = text.strip()
+  text = text.strip()
 
-    if text.startswith("```"):
-        text = text.replace("```json", "", 1)
-        text = text.replace("```", "")
+  if text.startswith("```"):
+    text = text.replace("```json", "", 1)
+    text = text.replace("```", "")
 
-    return json.loads(text.strip())
+  return json.loads(text.strip())
 
 
 # -----------------------------
 # Google Gemini
 # -----------------------------
 
+
 def generate_with_google(job_title):
+  genai.configure(api_key=google_key)
 
-    genai.configure(api_key=google_key)
+  # Active production model endpoint
+  model = genai.GenerativeModel("gemini-2.5-flash")
 
-    model = genai.GenerativeModel(
-        "gemini-2.5-flash"
-    )
-
-    prompt = f"""
+  prompt = f"""
 You are an expert job interview coach.
 
 Create an interview preparation guide for:
@@ -104,20 +100,20 @@ Use exactly this structure:
 }}
 """
 
-    response = model.generate_content(prompt)
+  response = model.generate_content(prompt)
 
-    return clean_json(response.text)
+  return clean_json(response.text)
 
 
 # -----------------------------
 # Groq
 # -----------------------------
 
+
 def generate_with_groq(job_title):
+  client = Groq(api_key=groq_key)
 
-    client = Groq(api_key=groq_key)
-
-    prompt = f"""
+  prompt = f"""
 You are an expert job interview coach.
 
 Create an interview preparation guide for:
@@ -148,82 +144,53 @@ Use exactly this structure:
 }}
 """
 
-    response = client.chat.completions.create(
-        model="llama-3.1-8b-instant",
-        messages=[
-            {
-                "role": "system",
-                "content": "You are an expert interview preparation assistant."
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ],
-        temperature=0.7
-    )
+  response = client.chat.completions.create(
+      model="llama-3.1-8b-instant",
+      messages=[
+          {
+              "role": "system",
+              "content": "You are an expert interview preparation assistant.",
+          },
+          {"role": "user", "content": prompt},
+      ],
+      temperature=0.7,
+  )
 
-    return clean_json(
-        response.choices[0].message.content
-    )
+  return clean_json(response.choices[0].message.content)
 
 
 # -----------------------------
 # Generate Button
 # -----------------------------
 
-if st.button(
-    "🚀 Generate Interview Questions",
-    use_container_width=True
-):
+if st.button("🚀 Generate Interview Questions", use_container_width=True):
+  if not job_title.strip():
+    st.warning("Please enter a job title.")
 
-    if not job_title.strip():
+  elif not google_key and not groq_key:
+    st.error(
+        "No API key found. Please add "
+        "GOOGLE_API_KEY or GROQ_API_KEY "
+        "in Streamlit Cloud Secrets."
+    )
 
-        st.warning(
-            "Please enter a job title."
-        )
+  else:
+    with st.spinner("Generating your interview preparation..."):
+      try:
+        # Google Gemini is used first
+        if google_key:
+          result = generate_with_google(job_title)
 
-    elif not google_key and not groq_key:
+        # Groq is used as fallback
+        elif groq_key:
+          result = generate_with_groq(job_title)
 
-        st.error(
-            "No API key found. Please add "
-            "GOOGLE_API_KEY or GROQ_API_KEY "
-            "in Streamlit Cloud Secrets."
-        )
+        st.session_state["questions"] = result["questions"]
 
-    else:
+      except Exception as e:
+        st.error("Something went wrong while generating questions.")
 
-        with st.spinner(
-            "Generating your interview preparation..."
-        ):
-
-            try:
-
-                # Google Gemini is used first
-                if google_key:
-
-                    result = generate_with_google(
-                        job_title
-                    )
-
-                # Groq is used as fallback
-                elif groq_key:
-
-                    result = generate_with_groq(
-                        job_title
-                    )
-
-                st.session_state["questions"] = (
-                    result["questions"]
-                )
-
-            except Exception as e:
-
-                st.error(
-                    "Something went wrong while generating questions."
-                )
-
-                st.code(str(e))
+        st.code(str(e))
 
 
 # -----------------------------
@@ -231,49 +198,22 @@ if st.button(
 # -----------------------------
 
 if "questions" in st.session_state:
+  st.divider()
 
-    st.divider()
+  st.subheader(f"📚 Interview Preparation: {job_title}")
 
-    st.subheader(
-        f"📚 Interview Preparation: {job_title}"
-    )
+  for index, item in enumerate(st.session_state["questions"], start=1):
+    question = item.get("question", "Interview Question")
 
-    for index, item in enumerate(
-        st.session_state["questions"],
-        start=1
-    ):
+    question_type = item.get("type", "Interview")
 
-        question = item.get(
-            "question",
-            "Interview Question"
-        )
+    answer = item.get("answer", "No answer generated.")
 
-        question_type = item.get(
-            "type",
-            "Interview"
-        )
+    with st.expander(f"{index}. {question}", expanded=False):
+      st.markdown(f"**Type:** {question_type}")
 
-        answer = item.get(
-            "answer",
-            "No answer generated."
-        )
+      st.markdown("### 💡 Ideal Sample Answer")
 
-        with st.expander(
-            f"{index}. {question}",
-            expanded=False
-        ):
+      st.write(answer)
 
-            st.markdown(
-                f"**Type:** {question_type}"
-            )
-
-            st.markdown(
-                "### 💡 Ideal Sample Answer"
-            )
-
-            st.write(answer)
-
-    st.success(
-        "Your interview preparation guide is ready! 🎉"
-    )
-
+  st.success("Your interview preparation guide is ready! 🎉")
