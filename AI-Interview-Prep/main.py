@@ -65,9 +65,7 @@ def clean_json(text):
 
 def generate_with_google(job_title):
   genai.configure(api_key=google_key)
-
-  # Updated to current active model name
-  model = genai.GenerativeModel("gemini-3.6-flash")
+  model = genai.GenerativeModel("gemini-1.5-flash")
 
   prompt = f"""
 You are an expert job interview coach.
@@ -101,7 +99,6 @@ Use exactly this structure:
 """
 
   response = model.generate_content(prompt)
-
   return clean_json(response.text)
 
 
@@ -169,28 +166,37 @@ if st.button("🚀 Generate Interview Questions", use_container_width=True):
 
   elif not google_key and not groq_key:
     st.error(
-        "No API key found. Please add "
-        "GOOGLE_API_KEY or GROQ_API_KEY "
-        "in Streamlit Cloud Secrets."
+        "No API key found. Please add GOOGLE_API_KEY or GROQ_API_KEY in"
+        " Streamlit Cloud Secrets."
     )
 
   else:
     with st.spinner("Generating your interview preparation..."):
-      try:
-        # Google Gemini is used first
-        if google_key:
+      result = None
+
+      # Try Google Gemini first (if key exists)
+      if google_key:
+        try:
           result = generate_with_google(job_title)
+        except Exception as e:
+          st.info(
+              "Gemini quota reached or error encountered. Switching to Groq"
+              " backup..."
+          )
 
-        # Groq is used as fallback
-        elif groq_key:
+      # If Gemini failed or wasn't provided, use Groq fallback
+      if not result and groq_key:
+        try:
           result = generate_with_groq(job_title)
+        except Exception as e:
+          st.error(f"Groq error: {str(e)}")
 
+      if result and "questions" in result:
         st.session_state["questions"] = result["questions"]
-
-      except Exception as e:
-        st.error("Something went wrong while generating questions.")
-
-        st.code(str(e))
+      else:
+        st.error(
+            "Could not generate questions. Please check your API keys or limits."
+        )
 
 
 # -----------------------------
@@ -204,16 +210,12 @@ if "questions" in st.session_state:
 
   for index, item in enumerate(st.session_state["questions"], start=1):
     question = item.get("question", "Interview Question")
-
     question_type = item.get("type", "Interview")
-
     answer = item.get("answer", "No answer generated.")
 
     with st.expander(f"{index}. {question}", expanded=False):
       st.markdown(f"**Type:** {question_type}")
-
       st.markdown("### 💡 Ideal Sample Answer")
-
       st.write(answer)
 
   st.success("Your interview preparation guide is ready! 🎉")
