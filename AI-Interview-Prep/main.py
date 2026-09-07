@@ -59,7 +59,61 @@ def clean_json(text):
 
 
 # -----------------------------
-# Google Gemini
+# Groq (Primary)
+# -----------------------------
+
+
+def generate_with_groq(job_title):
+  client = Groq(api_key=groq_key)
+
+  prompt = f"""
+You are an expert job interview coach.
+
+Create an interview preparation guide for:
+
+Job Role: {job_title}
+
+Generate exactly 10 interview questions.
+
+Requirements:
+- Approximately 6 technical questions
+- Approximately 4 HR/behavioral questions
+- Questions must be specific to the job role
+- Every question must have an ideal sample answer
+- Answers should be professional, practical, concise, and useful
+- Do not include markdown
+- Return ONLY valid JSON
+
+Use exactly this structure:
+
+{{
+  "questions": [
+    {{
+      "type": "Technical",
+      "question": "Question",
+      "answer": "Ideal sample answer"
+    }}
+  ]
+}}
+"""
+
+  response = client.chat.completions.create(
+      model="llama-3.3-70b-versatile",
+      messages=[
+          {
+              "role": "system",
+              "content": "You are an expert interview preparation assistant.",
+          },
+          {"role": "user", "content": prompt},
+      ],
+      temperature=0.7,
+  )
+
+  return clean_json(response.choices[0].message.content)
+
+
+# -----------------------------
+# Google Gemini (Backup)
 # -----------------------------
 
 
@@ -103,60 +157,6 @@ Use exactly this structure:
 
 
 # -----------------------------
-# Groq
-# -----------------------------
-
-
-def generate_with_groq(job_title):
-  client = Groq(api_key=groq_key)
-
-  prompt = f"""
-You are an expert job interview coach.
-
-Create an interview preparation guide for:
-
-Job Role: {job_title}
-
-Generate exactly 10 interview questions.
-
-Requirements:
-- Approximately 6 technical questions
-- Approximately 4 HR/behavioral questions
-- Questions must be specific to the job role
-- Every question must have an ideal sample answer
-- Answers should be professional, practical, concise, and useful
-- Do not include markdown
-- Return ONLY valid JSON
-
-Use exactly this structure:
-
-{{
-  "questions": [
-    {{
-      "type": "Technical",
-      "question": "Question",
-      "answer": "Ideal sample answer"
-    }}
-  ]
-}}
-"""
-
-  response = client.chat.completions.create(
-      model="llama-3.1-8b-instant",
-      messages=[
-          {
-              "role": "system",
-              "content": "You are an expert interview preparation assistant.",
-          },
-          {"role": "user", "content": prompt},
-      ],
-      temperature=0.7,
-  )
-
-  return clean_json(response.choices[0].message.content)
-
-
-# -----------------------------
 # Generate Button
 # -----------------------------
 
@@ -164,9 +164,9 @@ if st.button("🚀 Generate Interview Questions", use_container_width=True):
   if not job_title.strip():
     st.warning("Please enter a job title.")
 
-  elif not google_key and not groq_key:
+  elif not groq_key and not google_key:
     st.error(
-        "No API key found. Please add GOOGLE_API_KEY or GROQ_API_KEY in"
+        "No API key found. Please add GROQ_API_KEY or GOOGLE_API_KEY in"
         " Streamlit Cloud Secrets."
     )
 
@@ -174,22 +174,19 @@ if st.button("🚀 Generate Interview Questions", use_container_width=True):
     with st.spinner("Generating your interview preparation..."):
       result = None
 
-      # Try Google Gemini first (if key exists)
-      if google_key:
-        try:
-          result = generate_with_google(job_title)
-        except Exception as e:
-          st.info(
-              "Gemini quota reached or error encountered. Switching to Groq"
-              " backup..."
-          )
-
-      # If Gemini failed or wasn't provided, use Groq fallback
-      if not result and groq_key:
+      # Try Groq first (Primary to avoid Gemini quota issues)
+      if groq_key:
         try:
           result = generate_with_groq(job_title)
         except Exception as e:
-          st.error(f"Groq error: {str(e)}")
+          st.info("Groq encountered an issue. Trying Gemini backup...")
+
+      # Fallback to Gemini if Groq failed
+      if not result and google_key:
+        try:
+          result = generate_with_google(job_title)
+        except Exception as e:
+          st.error(f"Gemini error: {str(e)}")
 
       if result and "questions" in result:
         st.session_state["questions"] = result["questions"]
